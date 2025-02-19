@@ -6,13 +6,25 @@
     <title>Fitness & GATE Tracker</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: linear-gradient(270deg, #ff9a9e, #fad0c4, #fad0c4, #ffdde1);
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
+        }
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
         .container { display: flex; flex-wrap: wrap; gap: 20px; }
-        .card { border: 1px solid #ccc; padding: 20px; border-radius: 10px; width: 350px; }
+        .card { border: 1px solid #ccc; padding: 20px; border-radius: 10px; width: 350px; background: white; }
         input, button, select { width: 100%; padding: 10px; margin-top: 10px; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
         .delete-btn { background: red; color: white; border: none; padding: 5px; cursor: pointer; }
+        canvas { max-width: 100%; height: 200px; }
     </style>
 </head>
 <body>
@@ -51,7 +63,7 @@
         </div>
     </div>
     <script>
-        const SHEET_URL = "https://script.google.com/macros/s/AKfycbz4gOHxaL5XaWSsRoEO5JYEX24FcH3dqxalLDXQ9RzRsSppueNPxrKIjJYDk4LXrry7cQ/exec"; 
+        let charts = {};
 
         function logData(type) {
             let input;
@@ -65,25 +77,21 @@
             }
             if (!input) { alert("Please enter a valid value."); return; }
             
-            const entry = { type, value: input };
-            saveToGoogleSheets(entry);
+            const entry = { type, value: input, date: new Date().toLocaleString() };
+            saveToLocalStorage(entry);
         }
 
-        function saveToGoogleSheets(entry) {
-            fetch(SHEET_URL, {
-                method: "POST",
-                body: JSON.stringify(entry),
-                headers: { "Content-Type": "application/json" }
-            }).then(response => response.text())
-              .then(data => { console.log(data); fetchData(); });
+        function saveToLocalStorage(entry) {
+            let data = JSON.parse(localStorage.getItem("fitnessGateData")) || [];
+            data.push(entry);
+            localStorage.setItem("fitnessGateData", JSON.stringify(data));
+            fetchData();
         }
 
         function fetchData() {
-            fetch(SHEET_URL)
-                .then(response => response.json())
-                .then(data => {
-                    populateTables(data);
-                });
+            let data = JSON.parse(localStorage.getItem("fitnessGateData")) || [];
+            populateTables(data);
+            updateCharts(data);
         }
 
         function populateTables(data) {
@@ -91,10 +99,10 @@
             Object.keys(tables).forEach(type => {
                 const table = document.getElementById(tables[type]);
                 table.innerHTML = `<tr><th>Date</th><th>Value</th><th>Action</th></tr>`;
-                data.filter(row => row[1] === type).forEach((row, index) => {
+                data.filter(row => row.type === type).forEach((row, index) => {
                     table.innerHTML += `<tr>
-                        <td>${row[0]}</td>
-                        <td>${row[2]}</td>
+                        <td>${row.date}</td>
+                        <td>${row.value}</td>
                         <td><button class="delete-btn" onclick="deleteEntry(${index})">X</button></td>
                     </tr>`;
                 });
@@ -102,9 +110,46 @@
         }
 
         function deleteEntry(index) {
-            fetch(SHEET_URL + "?deleteIndex=" + index, { method: "GET" })
-                .then(response => response.text())
-                .then(data => { console.log(data); fetchData(); });
+            let data = JSON.parse(localStorage.getItem("fitnessGateData")) || [];
+            data.splice(index, 1);
+            localStorage.setItem("fitnessGateData", JSON.stringify(data));
+            fetchData();
+        }
+
+        function updateCharts(data) {
+            const categories = { weight: [], bp: [], gate: [] };
+            const dates = { weight: [], bp: [], gate: [] };
+
+            data.forEach(entry => {
+                if (entry.type === 'weight') {
+                    categories.weight.push(parseFloat(entry.value));
+                    dates.weight.push(entry.date);
+                } else if (entry.type === 'bp') {
+                    categories.bp.push(entry.value);
+                    dates.bp.push(entry.date);
+                } else if (entry.type === 'gate') {
+                    const hours = parseFloat(entry.value.split(': ')[1].replace(' hrs', ''));
+                    categories.gate.push(hours);
+                    dates.gate.push(entry.date);
+                }
+            });
+
+            renderChart('weightChart', dates.weight, categories.weight, 'Weight (kg)');
+            renderChart('bpChart', dates.bp, categories.bp, 'Blood Pressure');
+            renderChart('gateChart', dates.gate, categories.gate, 'GATE Study Hours');
+        }
+
+        function renderChart(id, labels, data, label) {
+            if (charts[id]) charts[id].destroy();
+            const ctx = document.getElementById(id).getContext('2d');
+            charts[id] = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [{ label, data, borderColor: 'blue', fill: false }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
         }
 
         window.onload = fetchData;
