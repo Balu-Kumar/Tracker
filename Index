@@ -8,8 +8,11 @@
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; }
         .container { display: flex; flex-wrap: wrap; gap: 20px; }
-        .card { border: 1px solid #ccc; padding: 20px; border-radius: 10px; width: 300px; }
-        input, button { width: 100%; padding: 10px; margin-top: 10px; }
+        .card { border: 1px solid #ccc; padding: 20px; border-radius: 10px; width: 350px; }
+        input, button, select { width: 100%; padding: 10px; margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        .delete-btn { background: red; color: white; border: none; padding: 5px; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -19,62 +22,92 @@
             <h2>Weight</h2>
             <input type="number" id="weightInput" placeholder="Enter weight (kg)">
             <button onclick="logData('weight')">Log</button>
+            <table id="weightTable"></table>
             <canvas id="weightChart"></canvas>
         </div>
         <div class="card">
             <h2>Blood Pressure</h2>
             <input type="text" id="bpInput" placeholder="Enter BP (e.g., 120/80)">
             <button onclick="logData('bp')">Log</button>
+            <table id="bpTable"></table>
             <canvas id="bpChart"></canvas>
+        </div>
+        <div class="card">
+            <h2>GATE Preparation</h2>
+            <select id="gateSubject">
+                <option value="Mathematics">Mathematics</option>
+                <option value="Fluid Mechanics">Fluid Mechanics</option>
+                <option value="Thermodynamics">Thermodynamics</option>
+                <option value="Heat Transfer">Heat Transfer</option>
+                <option value="Process Control">Process Control</option>
+                <option value="Chemical Reaction Engineering">Chemical Reaction Engineering</option>
+                <option value="Mass Transfer">Mass Transfer</option>
+                <option value="Instrumentation">Instrumentation</option>
+            </select>
+            <input type="number" id="studyHours" placeholder="Hours studied">
+            <button onclick="logData('gate')">Log</button>
+            <table id="gateTable"></table>
+            <canvas id="gateChart"></canvas>
         </div>
     </div>
     <script>
-        const GOOGLE_SHEET_URL = "https://script.google.com/macros/s/AKfycbxB4Wm14aD4dRIbPJCs7J6Q3YAs9QdXXFzGXeC6elQdgbCf-4GrA6U0oDzslpRUNYFjrg/exec"; // Replace with your deployed script URL
+        const SHEET_URL = "https://script.google.com/macros/s/AKfycbxB4Wm14aD4dRIbPJCs7J6Q3YAs9QdXXFzGXeC6elQdgbCf-4GrA6U0oDzslpRUNYFjrg/exec"; 
 
-        async function logData(type) {
-            const input = document.getElementById(`${type}Input`).value;
-            if (!input) return;
-            const entry = { date: new Date().toLocaleDateString(), value: input };
-            saveLocally(type, entry);
-            updateChart(type);
-            await sendToGoogleSheets(entry, type);
+        function logData(type) {
+            let input;
+            if (type === 'gate') {
+                const subject = document.getElementById("gateSubject").value;
+                const hours = document.getElementById("studyHours").value.trim();
+                if (!hours) { alert("Please enter hours studied."); return; }
+                input = `${subject}: ${hours} hrs`;
+            } else {
+                input = document.getElementById(`${type}Input`).value.trim();
+            }
+            if (!input) { alert("Please enter a valid value."); return; }
+            
+            const entry = { type, value: input };
+            saveToGoogleSheets(entry);
         }
 
-        function saveLocally(type, entry) {
-            const data = JSON.parse(localStorage.getItem(type)) || [];
-            data.push(entry);
-            localStorage.setItem(type, JSON.stringify(data));
+        function saveToGoogleSheets(entry) {
+            fetch(SHEET_URL, {
+                method: "POST",
+                body: JSON.stringify(entry),
+                headers: { "Content-Type": "application/json" }
+            }).then(response => response.text())
+              .then(data => { console.log(data); fetchData(); });
         }
 
-        function updateChart(type) {
-            const data = JSON.parse(localStorage.getItem(type)) || [];
-            const ctx = document.getElementById(`${type}Chart`).getContext('2d');
-            new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: data.map(d => d.date),
-                    datasets: [{ label: type, data: data.map(d => d.value), borderColor: 'blue', fill: false }]
-                }
+        function fetchData() {
+            fetch(SHEET_URL)
+                .then(response => response.json())
+                .then(data => {
+                    populateTables(data);
+                });
+        }
+
+        function populateTables(data) {
+            const tables = { weight: "weightTable", bp: "bpTable", gate: "gateTable" };
+            Object.keys(tables).forEach(type => {
+                const table = document.getElementById(tables[type]);
+                table.innerHTML = `<tr><th>Date</th><th>Value</th><th>Action</th></tr>`;
+                data.filter(row => row[1] === type).forEach((row, index) => {
+                    table.innerHTML += `<tr>
+                        <td>${row[0]}</td>
+                        <td>${row[2]}</td>
+                        <td><button class="delete-btn" onclick="deleteEntry(${index})">X</button></td>
+                    </tr>`;
+                });
             });
         }
 
-        async function sendToGoogleSheets(entry, type) {
-            try {
-                const response = await fetch(GOOGLE_SHEET_URL, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ [type]: entry.value })
-                });
-                console.log("Google Sheets Response:", await response.text());
-            } catch (error) {
-                console.error("Error:", error);
-            }
+        function deleteEntry(index) {
+            fetch(SHEET_URL + "?deleteIndex=" + index, { method: "GET" })
+                .then(response => response.text())
+                .then(data => { console.log(data); fetchData(); });
         }
 
-        window.onload = function() {
-            updateChart('weight');
-            updateChart('bp');
-        };
+        window.onload = fetchData;
     </script>
 </body>
 </html>
