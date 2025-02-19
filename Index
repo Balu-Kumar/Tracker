@@ -51,7 +51,7 @@
         </div>
     </div>
     <script>
-        const SHEET_URL = "https://script.google.com/macros/s/AKfycbxB4Wm14aD4dRIbPJCs7J6Q3YAs9QdXXFzGXeC6elQdgbCf-4GrA6U0oDzslpRUNYFjrg/exec"; 
+        const SHEET_URL = "https://script.google.com/macros/s/AKfycbz4gOHxaL5XaWSsRoEO5JYEX24FcH3dqxalLDXQ9RzRsSppueNPxrKIjJYDk4LXrry7cQ/exec"; 
 
         function logData(type) {
             let input;
