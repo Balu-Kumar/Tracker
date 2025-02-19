@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fitness & GATE Tracker</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { display: flex; flex-wrap: wrap; gap: 20px; }
+        .card { border: 1px solid #ccc; padding: 20px; border-radius: 10px; width: 300px; }
+        input, button { width: 100%; padding: 10px; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Fitness & GATE Tracker</h1>
+    <div class="container">
+        <div class="card">
+            <h2>Weight</h2>
+            <input type="number" id="weightInput" placeholder="Enter weight (kg)">
+            <button onclick="logData('weight')">Log</button>
+            <canvas id="weightChart"></canvas>
+        </div>
+        <div class="card">
+            <h2>Blood Pressure</h2>
+            <input type="text" id="bpInput" placeholder="Enter BP (e.g., 120/80)">
+            <button onclick="logData('bp')">Log</button>
+            <canvas id="bpChart"></canvas>
+        </div>
+    </div>
+    <script>
+        const GOOGLE_SHEET_URL = "YOUR_GOOGLE_SCRIPT_WEB_APP_URL"; // Replace with your deployed script URL
+
+        async function logData(type) {
+            const input = document.getElementById(`${type}Input`).value;
+            if (!input) return;
+            const entry = { date: new Date().toLocaleDateString(), value: input };
+            saveLocally(type, entry);
+            updateChart(type);
+            await sendToGoogleSheets(entry, type);
+        }
+
+        function saveLocally(type, entry) {
+            const data = JSON.parse(localStorage.getItem(type)) || [];
+            data.push(entry);
+            localStorage.setItem(type, JSON.stringify(data));
+        }
+
+        function updateChart(type) {
+            const data = JSON.parse(localStorage.getItem(type)) || [];
+            const ctx = document.getElementById(`${type}Chart`).getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.map(d => d.date),
+                    datasets: [{ label: type, data: data.map(d => d.value), borderColor: 'blue', fill: false }]
+                }
+            });
+        }
+
+        async function sendToGoogleSheets(entry, type) {
+            try {
+                const response = await fetch(GOOGLE_SHEET_URL, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ [type]: entry.value })
+                });
+                console.log("Google Sheets Response:", await response.text());
+            } catch (error) {
+                console.error("Error:", error);
+            }
+        }
+
+        window.onload = function() {
+            updateChart('weight');
+            updateChart('bp');
+        };
+    </script>
+</body>
+</html>
