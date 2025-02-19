@@ -29,7 +29,7 @@
         </div>
     </div>
     <script>
-        const GOOGLE_SHEET_URL = "YOUR_GOOGLE_SCRIPT_WEB_APP_URL"; // Replace with your deployed script URL
+        const GOOGLE_SHEET_URL = "https://script.google.com/macros/s/AKfycbxB4Wm14aD4dRIbPJCs7J6Q3YAs9QdXXFzGXeC6elQdgbCf-4GrA6U0oDzslpRUNYFjrg/exec"; // Replace with your deployed script URL
 
         async function logData(type) {
             const input = document.getElementById(`${type}Input`).value;
